@@ -1,0 +1,132 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven { url 'http://dl.bintray.com/jfrog/jfrog-jars' }
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies {
+        classpath "me.champeau.gradle:jmh-gradle-plugin:0.5.0"
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'idea'
+    apply plugin: 'maven'
+    apply plugin: 'maven-publish'
+    apply plugin: 'signing'
+    apply plugin: "me.champeau.gradle.jmh"
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+
+    compileJava.options.encoding = 'UTF-8'
+    compileTestJava.options.encoding = 'UTF-8'
+
+    project.group = 'com.fnklabs.gouchy'
+    project.version = "$version"
+
+    configurations {
+        all*.exclude module: 'slf4j-log4j12'
+        all*.exclude module: 'hibernate-validator'
+        all*.exclude group: 'com.codahale.metrics'
+    }
+
+    ext {
+        vers = [
+                jmh     : "1.22",
+                junit   : '5.5.2',
+                jodatime: '2.9.2',
+                guava   : '28.1-jre',
+                intellij: '18.0.0',
+                lang3   : '3.3.2',
+                logback : '1.2.3',
+
+                metrics : '0.2.1',
+                mockito : '2.21.0',
+
+                slf4j   : '1.7.29',
+        ]
+    }
+
+    test {
+        useJUnitPlatform()
+        testLogging {
+            events "passed", "skipped", "failed"
+        }
+    }
+
+    java {
+        withJavadocJar()
+        withSourcesJar()
+    }
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+                versionMapping {
+                    usage('java-api') {
+                        fromResolutionOf('runtimeClasspath')
+                    }
+                    usage('java-runtime') {
+                        fromResolutionResult()
+                    }
+                }
+                pom {
+                    name = 'Gouchy'
+                    description = 'Graph execution library'
+                    url = 'https://github.com/fnklabs/gouchy'
+                    licenses {
+                        license {
+                            name = 'The Apache License, Version 2.0'
+                            url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = 'a.alimov'
+                            name = 'Alisher Alimov'
+                            email = 'alisher.alimov@fnklabs.com'
+                        }
+                    }
+                    scm {
+                        connection = 'scm:git@github.com:fnklabs/gouchy.git'
+                        developerConnection = 'scm:git:ssh:git@github.com:fnklabs/gouchy.git'
+                        url = 'https://github.com/fnklabs/gouchy'
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                def releasesRepoUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+                def snapshotsRepoUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
+                url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+                credentials {
+                    username = "$sonatypeUsername"
+                    password = "$sonatypePassword"
+                }
+            }
+        }
+    }
+
+    signing {
+        required { !version.endsWith('SNAPSHOT') && gradle.taskGraph.hasTask("publish") }
+        sign publishing.publications.mavenJava
+    }
+
+
+    javadoc {
+        if (JavaVersion.current().isJava9Compatible()) {
+            options.addBooleanOption('html5', true)
+        }
+    }
+
+}
